@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>Trailmark — Step Counter</title>
+<style>
+  :root {
+    --bg: #EDE6D6;
+    --ink: #2F4538;
+    --trail: #C4622D;
+    --sky: #5B87A6;
+    --card: #F8F4EA;
+    --line: #D8CFB8;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 20px 60px;
+  }
+
+  header {
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+
+  .wordmark {
+    font-size: 15px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .wordmark span { color: var(--trail); }
+
+  .date {
+    font-size: 12px;
+    color: var(--ink);
+    opacity: 0.55;
+  }
+
+  .count-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 40px 24px 32px;
+    text-align: center;
+  }
+
+  .count-label {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    opacity: 0.6;
+    margin-bottom: 8px;
+  }
+
+  .count {
+    font-family: "Arial Narrow", "Helvetica Neue Condensed", sans-serif;
+    font-weight: 800;
+    font-size: 88px;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .stats-row {
+    display: flex;
+    justify-content: center;
+    gap: 28px;
+    margin-top: 18px;
+    font-size: 13px;
+    opacity: 0.7;
+  }
+
+  .stats-row b { display: block; font-size: 16px; opacity: 1; color: var(--ink); }
+
+  /* Trail: footprints appear every 100 steps, marching left to right */
+  .trail-wrap {
+    width: 100%;
+    max-width: 420px;
+    margin-top: 20px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 18px 20px 20px;
+  }
+
+  .trail-label {
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    opacity: 0.6;
+    margin-bottom: 10px;
+  }
+
+  .trail-track {
+    position: relative;
+    height: 30px;
+    border-bottom: 2px dashed var(--line);
+    display: flex;
+    align-items: flex-end;
+    gap: 14px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .footprint {
+    flex: 0 0 auto;
+    font-size: 18px;
+    opacity: 0;
+    transform: translateY(6px);
+    animation: step-in 0.4s ease forwards;
+  }
+
+  @keyframes step-in {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .footprint:nth-child(odd) { transform: rotate(-8deg) translateY(6px); }
+  .footprint:nth-child(even) { transform: rotate(8deg) translateY(6px); margin-top: 6px; }
+
+  .controls {
+    width: 100%;
+    max-width: 420px;
+    margin-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  button {
+    font: inherit;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    padding: 14px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+  }
+
+  #startBtn {
+    background: var(--trail);
+    color: #fff;
+  }
+
+  #startBtn:disabled {
+    background: var(--line);
+    color: var(--ink);
+    cursor: default;
+  }
+
+  #resetBtn {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+
+  .status {
+    margin-top: 14px;
+    font-size: 12px;
+    text-align: center;
+    color: var(--sky);
+    min-height: 16px;
+  }
+</style>
+</head>
+<body>
+
+  <header>
+    <div class="wordmark">Trail<span>mark</span></div>
+    <div class="date" id="dateLabel"></div>
+  </header>
+
+  <div class="count-card">
+    <div class="count-label">Steps Today</div>
+    <div class="count" id="stepCount">0</div>
+    <div class="stats-row">
+      <div><b id="distanceVal">0.00</b>km</div>
+      <div><b id="calVal">0</b>kcal (est.)</div>
+    </div>
+  </div>
+
+  <div class="trail-wrap">
+    <div class="trail-label">Trail (1 print / 100 steps)</div>
+    <div class="trail-track" id="trailTrack"></div>
+  </div>
+
+  <div class="controls">
+    <button id="startBtn">Enable Motion &amp; Start</button>
+    <button id="resetBtn">Reset</button>
+  </div>
+
+  <div class="status" id="statusMsg"></div>
+
+<script>
+  // ---- Basic setup ----
+  const stepCountEl = document.getElementById('stepCount');
+  const distanceEl = document.getElementById('distanceVal');
+  const calEl = document.getElementById('calVal');
+  const trailTrack = document.getElementById('trailTrack');
+  const startBtn = document.getElementById('startBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const statusMsg = document.getElementById('statusMsg');
+  const dateLabel = document.getElementById('dateLabel');
+
+  dateLabel.textContent = new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+
+  let steps = parseInt(localStorage.getItem('trailmark_steps') || '0', 10);
+  let footprintsShown = 0;
+  const STRIDE_METERS = 0.78; // rough average stride length
+  const CAL_PER_STEP = 0.04;  // rough estimate
+
+  function render() {
+    stepCountEl.textContent = steps.toLocaleString();
+    distanceEl.textContent = ((steps * STRIDE_METERS) / 1000).toFixed(2);
+    calEl.textContent = Math.round(steps * CAL_PER_STEP);
+
+    const milestonesReached = Math.floor(steps / 100);
+    while (footprintsShown < milestonesReached) {
+      const fp = document.createElement('div');
+      fp.className = 'footprint';
+      fp.textContent = '👣';
+      trailTrack.appendChild(fp);
+      footprintsShown++;
+    }
+    trailTrack.scrollLeft = trailTrack.scrollWidth;
+    localStorage.setItem('trailmark_steps', steps);
+  }
+
+  render();
+
+  // ---- Step detection from device motion ----
+  // We watch the magnitude of acceleration and count a "step" each time
+  // it crosses a threshold peak, with a short cooldown so one physical
+  // step isn't counted twice.
+  let lastMagnitude = 0;
+  let lastStepTime = 0;
+  const THRESHOLD = 1.2;      // sensitivity — raise if it over-counts, lower if it under-counts
+  const MIN_INTERVAL_MS = 300; // fastest realistic time between steps
+
+  function handleMotion(event) {
+    const acc = event.accelerationIncludingGravity;
+    if (!acc) return;
+
+    const magnitude = Math.sqrt(
+      (acc.x || 0) ** 2 + (acc.y || 0) ** 2 + (acc.z || 0) ** 2
+    );
+    const delta = magnitude - lastMagnitude;
+    lastMagnitude = magnitude;
+
+    const now = Date.now();
+    if (delta > THRESHOLD && (now - lastStepTime) > MIN_INTERVAL_MS) {
+      lastStepTime = now;
+      steps++;
+      render();
+    }
+  }
+
+  function beginTracking() {
+    window.addEventListener('devicemotion', handleMotion);
+    startBtn.disabled = true;
+    startBtn.textContent = 'Tracking…';
+    statusMsg.textContent = 'Keep your phone with you and walk to test it.';
+  }
+
+  startBtn.addEventListener('click', async () => {
+    // iOS 13+ requires an explicit permission request triggered by a tap
+    if (typeof DeviceMotionEvent !== 'undefined' &&
+        typeof DeviceMotionEvent.requestPermission === 'function') {
+      try {
+        const result = await DeviceMotionEvent.requestPermission();
+        if (result === 'granted') {
+          beginTracking();
+        } else {
+          statusMsg.textContent = 'Motion permission was denied.';
+        }
+      } catch (err) {
+        statusMsg.textContent = 'Could not request motion permission.';
+      }
+    } else if (window.DeviceMotionEvent) {
+      // Android / other browsers: no explicit permission step needed
+      beginTracking();
+    } else {
+      statusMsg.textContent = 'This device/browser does not support motion sensors.';
+    }
+  });
+
+  resetBtn.addEventListener('click', () => {
+    steps = 0;
+    footprintsShown = 0;
+    trailTrack.innerHTML = '';
+    render();
+  });
+</script>
+
+</body>
+</html>
